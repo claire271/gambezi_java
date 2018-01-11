@@ -383,7 +383,7 @@ public class _Node {
 		ByteBuffer buffer = ByteBuffer.allocate(length);
 		buffer.order(ByteOrder.BIG_ENDIAN);
 		buffer.put(this.__data, 0, length);
-		return buffer.getFloat(0);
+		return buffer.getDouble(0);
 	}
 
 	//------------------------------------------------------------------------------
