@@ -262,7 +262,9 @@ public class Gambezi implements GambeziWebsocketListener {
 			// Queue up ID request if needed and already connected
 			if(this.__ready) {
 				if(node.get_id() < 0) {
-					this.__key_request_queue.push(Arrays.<String>copyOfRange(string_key, 0, i+1));
+					synchronized(this.__key_request_queue) {
+						this.__key_request_queue.push(Arrays.<String>copyOfRange(string_key, 0, i+1));
+					}
 				}
 			}
 		}
@@ -320,36 +322,38 @@ public class Gambezi implements GambeziWebsocketListener {
 		// This method is always guarded when called, so no need to check readiness
 
 		// Process entires until one succeeds without an error
-		while(this.__key_request_queue.size() > 0) {
-			int code = 0;
+		synchronized(this.__key_request_queue) {
+			while(this.__key_request_queue.size() > 0) {
+				int code = 0;
 
-			// Build the binary parent key
-			String[] string_key = this.__key_request_queue.remove();
-			byte[] parent_binary_key = new byte[string_key.length - 1];
-			_Node node = this.__root_node;
-			for(int i = 0;i < string_key.length - 1;i++) {
-				node = node._get_child_with_name(string_key[i]);
-				int ident = node.get_id();
-				// Bail if the parent does not have an ID
-				if(ident < 0) {
-					code = 1;
+				// Build the binary parent key
+				String[] string_key = this.__key_request_queue.remove();
+				byte[] parent_binary_key = new byte[string_key.length - 1];
+				_Node node = this.__root_node;
+				for(int i = 0;i < string_key.length - 1;i++) {
+					node = node._get_child_with_name(string_key[i]);
+					int ident = node.get_id();
+					// Bail if the parent does not have an ID
+					if(ident < 0) {
+						code = 1;
+						break;
+					}
+					parent_binary_key[i] = (byte)(ident);
+				}
+
+				// Error when building binary key
+				if(code > 0) {
+					if(this.on_error != null) {
+						this.on_error.on_error("Error processing ID queue");
+					}
+				}
+				// No error
+				else {
+					// Request the ID
+					String name = string_key[string_key.length - 1];
+					this._request_id(parent_binary_key, name, false, false);
 					break;
 				}
-				parent_binary_key[i] = (byte)(ident);
-			}
-
-			// Error when building binary key
-			if(code > 0) {
-				if(this.on_error != null) {
-					this.on_error.on_error("Error processing ID queue");
-				}
-			}
-			// No error
-			else {
-				// Request the ID
-				String name = string_key[string_key.length - 1];
-				this._request_id(parent_binary_key, name, false, false);
-				break;
 			}
 		}
 	}
@@ -364,7 +368,9 @@ public class Gambezi implements GambeziWebsocketListener {
 		if(parent_string_key != null) {
 			string_key = Arrays.copyOf(parent_string_key, parent_string_key.length+1);
 			string_key[parent_string_key.length] = node.get_name();
-            this.__key_request_queue.add(string_key);
+			synchronized(this.__key_request_queue) {
+				this.__key_request_queue.add(string_key);
+			}
 		}
         // Root node
 		else {
